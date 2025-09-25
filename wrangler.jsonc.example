@@ -1,0 +1,92 @@
+{
+  "name": "ppoi-api",
+  "main": "src/worker/index.ts",
+  "account_id": "your-cloudflare-account-id-here",
+  "compatibility_date": "2025-09-01",
+
+  "ai": {
+    "binding": "AI",
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ppoi-db",
+      "database_id": "your-d1-database-id-here",
+      "migrations_dir": "drizzle",
+    },
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "your-kv-namespace-id-here",
+    },
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "ppoi-images",
+    },
+  ],
+
+  "vectorize": [
+    {
+      "binding": "VEC",
+      "index_name": "ppoi-embeddings",
+    },
+  ],
+
+  "observability": {
+    "enabled": true,
+  },
+
+  "env": {
+    "development": {
+      "vars": {
+        "VECTORIZE_INDEX": "ppoi-embeddings-dev",
+        "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5",
+        "IMAGE_MODEL_FAST": "@cf/leonardo/phoenix-1.0",
+        "IMAGE_MODEL_QUALITY": "@cf/leonardo/phoenix-1.0",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "ppoi-db-dev",
+          "database_id": "your-dev-d1-database-id-here",
+          "preview_database_id": "your-dev-d1-database-id-here",
+          "migrations_dir": "drizzle",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "your-dev-kv-namespace-id-here",
+          "preview_id": "your-dev-kv-namespace-id-here",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "ppoi-images-dev",
+          "preview_bucket_name": "ppoi-images-dev",
+        },
+      ],
+      "vectorize": [
+        {
+          "binding": "VEC",
+          "index_name": "ppoi-embeddings-dev",
+        },
+      ],
+    },
+    "production": {
+      "vars": {
+        "VECTORIZE_INDEX": "ppoi-embeddings",
+        "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5",
+        "IMAGE_MODEL_FAST": "@cf/leonardo/phoenix-1.0",
+        "IMAGE_MODEL_QUALITY": "@cf/leonardo/phoenix-1.0",
+      },
+    },
+  },
+}
