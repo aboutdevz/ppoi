@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { Env } from "../index";
+import type { AiModels } from "@cloudflare/workers-types";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc, and, sql, or, like } from "drizzle-orm";
 import * as schema from "../../db/schema";
@@ -12,7 +13,7 @@ const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  type: z.enum(["images", "users", "prompts"]).default("images"),
+  type: z.enum(["images", "users", "prompts", "similar"]).default("images"),
 });
 
 type SearchResult = {
@@ -265,6 +266,201 @@ searchRoute.get(
               aspectRatio: prompt.sampleAspectRatio,
             },
           }));
+          break;
+        }
+
+        case "similar": {
+          // Similarity search using prompt embeddings
+          try {
+            // Generate embedding for the search query
+            const embeddingResponse = (await c.env.AI.run(
+              c.env.EMBEDDING_MODEL as keyof AiModels,
+              { text: query },
+            )) as { data: number[][] };
+
+            if (
+              !embeddingResponse.data ||
+              embeddingResponse.data.length === 0
+            ) {
+              throw new Error("No embedding generated");
+            }
+
+            const queryEmbedding = embeddingResponse.data[0];
+
+            // Search for similar embeddings in Vectorize
+            const vectorResults = await c.env.VEC.query(queryEmbedding, {
+              topK: Math.min(limit * 3, 100), // Get more results to filter
+              returnMetadata: true,
+            });
+
+            if (!vectorResults.matches || vectorResults.matches.length === 0) {
+              results = [];
+              totalCount = 0;
+              break;
+            }
+
+            // Extract image IDs from vector results
+            const imageIds = vectorResults.matches
+              .map((match) => match.id)
+              .slice(offset, offset + limit);
+
+            if (imageIds.length === 0) {
+              results = [];
+              totalCount = 0;
+              break;
+            }
+
+            // Fetch image details from database
+            const images = await db
+              .select({
+                id: schema.images.id,
+                userId: schema.images.userId,
+                prompt: schema.images.prompt,
+                model: schema.images.model,
+                aspectRatio: schema.images.aspectRatio,
+                width: schema.images.width,
+                height: schema.images.height,
+                r2Key: schema.images.r2Key,
+                likeCount: schema.images.likeCount,
+                commentCount: schema.images.commentCount,
+                createdAt: schema.images.createdAt,
+                userName: schema.users.name,
+                userHandle: schema.users.handle,
+                userImage: schema.users.image,
+                isAnonymous: schema.users.isAnonymous,
+              })
+              .from(schema.images)
+              .leftJoin(schema.users, eq(schema.images.userId, schema.users.id))
+              .where(
+                and(
+                  eq(schema.images.isPrivate, false),
+                  sql`${schema.images.id} IN ${imageIds.map(() => "?").join(",")}`,
+                ),
+              );
+
+            // Helper function to get image URL
+            const getImageUrl = (r2Key: string): string => {
+              const url = new URL(c.req.url);
+              return `${url.protocol}//${url.host}/v1/serve/${r2Key}`;
+            };
+
+            // Match images with their similarity scores
+            const imageMap = new Map(images.map((img) => [img.id, img]));
+            const orderedResults = imageIds
+              .map((id) => {
+                const image = imageMap.get(id);
+                if (!image) return null;
+
+                const matchIndex = vectorResults.matches.findIndex(
+                  (m) => m.id === id,
+                );
+                const score =
+                  matchIndex >= 0 ? vectorResults.matches[matchIndex].score : 0;
+
+                return {
+                  type: "image" as const,
+                  id: image.id,
+                  url: getImageUrl(image.r2Key),
+                  prompt: image.prompt,
+                  model: image.model,
+                  aspectRatio: image.aspectRatio,
+                  width: image.width,
+                  height: image.height,
+                  likeCount: image.likeCount,
+                  commentCount: image.commentCount,
+                  createdAt: image.createdAt,
+                  similarity: score,
+                  user: {
+                    id: image.userId,
+                    name: image.userName,
+                    handle: image.userHandle,
+                    image: image.userImage,
+                    isAnonymous: image.isAnonymous,
+                  },
+                };
+              })
+              .filter(Boolean);
+
+            results = orderedResults.filter(Boolean) as SearchResult[];
+            totalCount = vectorResults.matches.length;
+          } catch (error) {
+            console.error("Similarity search error:", error);
+            // Fallback to regular text search
+            const searchConditions = query
+              .toLowerCase()
+              .split(" ")
+              .filter((term) => term.length > 0)
+              .map((term) =>
+                or(
+                  like(sql`lower(${schema.images.prompt})`, `%${term}%`),
+                  like(
+                    sql`lower(${schema.images.negativePrompt})`,
+                    `%${term}%`,
+                  ),
+                ),
+              );
+
+            const images = await db
+              .select({
+                id: schema.images.id,
+                userId: schema.images.userId,
+                prompt: schema.images.prompt,
+                model: schema.images.model,
+                aspectRatio: schema.images.aspectRatio,
+                width: schema.images.width,
+                height: schema.images.height,
+                r2Key: schema.images.r2Key,
+                likeCount: schema.images.likeCount,
+                commentCount: schema.images.commentCount,
+                createdAt: schema.images.createdAt,
+                userName: schema.users.name,
+                userHandle: schema.users.handle,
+                userImage: schema.users.image,
+                isAnonymous: schema.users.isAnonymous,
+              })
+              .from(schema.images)
+              .leftJoin(schema.users, eq(schema.images.userId, schema.users.id))
+              .where(
+                and(
+                  eq(schema.images.isPrivate, false),
+                  or(...searchConditions),
+                ),
+              )
+              .orderBy(
+                desc(schema.images.likeCount),
+                desc(schema.images.createdAt),
+              )
+              .limit(limit)
+              .offset(offset);
+
+            const getImageUrl = (r2Key: string): string => {
+              const url = new URL(c.req.url);
+              return `${url.protocol}//${url.host}/v1/serve/${r2Key}`;
+            };
+
+            results = images.map((image) => ({
+              type: "image" as const,
+              id: image.id,
+              url: getImageUrl(image.r2Key),
+              prompt: image.prompt,
+              model: image.model,
+              aspectRatio: image.aspectRatio,
+              width: image.width,
+              height: image.height,
+              likeCount: image.likeCount,
+              commentCount: image.commentCount,
+              createdAt: image.createdAt,
+              user: {
+                id: image.userId,
+                name: image.userName,
+                handle: image.userHandle,
+                image: image.userImage,
+                isAnonymous: image.isAnonymous,
+              },
+            }));
+
+            totalCount = images.length;
+          }
           break;
         }
       }

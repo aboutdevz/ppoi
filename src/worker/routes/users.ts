@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { Env } from "../index";
 import { drizzle } from "drizzle-orm/d1";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, desc } from "drizzle-orm";
 
 import * as schema from "../../db/schema";
 
@@ -135,7 +135,75 @@ usersRoute.post(
   },
 );
 
-// Get user profile
+// Get user profile by handle
+usersRoute.get("/users/handle/:handle", async (c) => {
+  try {
+    const handle = c.req.param("handle");
+    const currentUserId = c.req.header("X-PPOI-User");
+    const db = drizzle(c.env.DB, { schema });
+
+    const users = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.handle, handle))
+      .limit(1);
+
+    const user = users[0];
+    if (!user) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    // Check if current user follows this user
+    let isFollowing = false;
+    if (currentUserId && currentUserId !== user.id) {
+      const follows = await db
+        .select()
+        .from(schema.follows)
+        .where(
+          sql`${schema.follows.followerId} = ${currentUserId} AND ${schema.follows.followingId} = ${user.id}`,
+        )
+        .limit(1);
+      isFollowing = follows.length > 0;
+    }
+
+    // For private profiles, limit information if not following or not own profile
+    const isOwnProfile = currentUserId === user.id;
+    const canViewFull = isOwnProfile || !user.isAnonymous || isFollowing;
+
+    const publicUser = {
+      id: user.id,
+      name: user.name,
+      handle: user.handle,
+      image: user.image,
+      bio: user.bio,
+      isAnonymous: user.isAnonymous,
+      stats: {
+        imageCount: user.imageCount,
+        likeCount: user.likeCount,
+        followerCount: user.followerCount,
+        followingCount: user.followingCount,
+      },
+      createdAt: user.createdAt,
+      isFollowing,
+      canViewFull,
+    };
+
+    // Add private fields for own profile
+    if (isOwnProfile) {
+      return c.json({
+        ...publicUser,
+        email: user.email,
+      });
+    }
+
+    return c.json(publicUser);
+  } catch (error) {
+    console.error("Get user by handle error:", error);
+    return c.json({ error: "Failed to get user" }, 500);
+  }
+});
+
+// Get user profile by ID
 usersRoute.get("/users/:userId", async (c) => {
   try {
     const userId = c.req.param("userId");
@@ -301,11 +369,13 @@ usersRoute.get("/users/:userId/images", async (c) => {
 
     const isOwnProfile = currentUserId === userId;
 
-    // Build conditions - show private images only for own profile
-    const conditions = [eq(schema.images.userId, userId)];
-    if (!isOwnProfile) {
-      conditions.push(eq(schema.images.isPrivate, false));
-    }
+    // Build where condition - show private images only for own profile
+    const whereCondition = isOwnProfile
+      ? eq(schema.images.userId, userId)
+      : and(
+          eq(schema.images.userId, userId),
+          eq(schema.images.isPrivate, false),
+        );
 
     const images = await db
       .select({
@@ -321,8 +391,8 @@ usersRoute.get("/users/:userId/images", async (c) => {
         createdAt: schema.images.createdAt,
       })
       .from(schema.images)
-      .where(sql`${conditions.join(" AND ")}`)
-      .orderBy(sql`${schema.images.createdAt} DESC`)
+      .where(whereCondition)
+      .orderBy(desc(schema.images.createdAt))
       .limit(limit)
       .offset(offset);
 
@@ -330,7 +400,7 @@ usersRoute.get("/users/:userId/images", async (c) => {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
       .from(schema.images)
-      .where(sql`${conditions.join(" AND ")}`);
+      .where(whereCondition);
 
     // Helper function to get image URL
     const getImageUrl = (r2Key: string): string => {
@@ -343,6 +413,13 @@ usersRoute.get("/users/:userId/images", async (c) => {
       ...image,
       url: getImageUrl(image.r2Key),
     }));
+
+    console.log(`User ${userId} images query result:`, {
+      imageCount: images.length,
+      totalCount: count,
+      isOwnProfile,
+      currentUserId,
+    });
 
     return c.json({
       data: formattedImages,

@@ -77,21 +77,21 @@ export function Header() {
     >
       <div className="container flex h-16 items-center justify-between mx-auto">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2 group">
+        <Link href="/" className="flex items-center space-x-4 group">
           <motion.div
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-primary to-brand-magenta shadow-glow"
+            className="flex items-center justify-center"
             whileHover={{ scale: 1.05, rotate: 5 }}
             whileTap={{ scale: 0.95 }}
           >
             <Image
               src="/favicon-32x32.png"
               alt="ppoi logo"
-              width={20}
-              height={20}
-              className="w-5 h-5"
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded"
             />
           </motion.div>
-          <span className="font-bold text-xl bg-gradient-to-r from-brand-primary via-brand-magenta to-brand-cyan bg-clip-text text-transparent">
+          <span className="font-bold text-2xl bg-gradient-to-r from-brand-primary via-brand-magenta to-brand-cyan bg-clip-text text-transparent">
             ppoi
           </span>
         </Link>
@@ -210,6 +210,24 @@ function UserMenu() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link
+            href={`/u/${session.user.handle || session.user.name?.toLowerCase().replace(/[^a-z0-9]/g, "") || "profile"}`}
+            className="flex items-center"
+          >
+            <Avatar className="mr-2 h-4 w-4">
+              {session.user.image ? (
+                <AvatarImage
+                  src={session.user.image}
+                  alt={session.user.name || "User"}
+                />
+              ) : (
+                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+              )}
+            </Avatar>
+            <span>My Profile</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/generate" className="flex items-center">
             <PlusCircle className="mr-2 h-4 w-4" />

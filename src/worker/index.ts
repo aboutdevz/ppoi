@@ -1,5 +1,11 @@
 import { Hono } from "hono";
-import type { D1Database, R2Bucket, KVNamespace, VectorizeIndex, Ai } from "@cloudflare/workers-types";
+import type {
+  D1Database,
+  R2Bucket,
+  KVNamespace,
+  VectorizeIndex,
+  Ai,
+} from "@cloudflare/workers-types";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { timing } from "hono/timing";
@@ -17,13 +23,13 @@ export interface Env {
   R2: R2Bucket;
   KV: KVNamespace;
   VEC: VectorizeIndex;
-  
+
   // Environment variables
   VECTORIZE_INDEX: string;
   EMBEDDING_MODEL: string;
   IMAGE_MODEL_FAST: string;
   IMAGE_MODEL_QUALITY: string;
-  
+
   // Optional secrets
   TURNSTILE_SECRET?: string;
   RESEND_API_KEY?: string;
@@ -35,8 +41,28 @@ const app = new Hono<{ Bindings: Env }>();
 // Middleware
 app.use("*", logger());
 app.use("*", timing());
+
+// Security headers middleware
+app.use("*", async (c, next) => {
+  await next();
+
+  // Add security headers
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("X-XSS-Protection", "1; mode=block");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+
+  // Add CSP for API responses
+  if (c.req.path.startsWith("/v1/")) {
+    c.header(
+      "Content-Security-Policy",
+      "default-src 'none'; frame-ancestors 'none';",
+    );
+  }
+});
 app.use(
-  "*", 
+  "*",
   cors({
     origin: (origin) => {
       // In development, allow localhost and 127.0.0.1
@@ -44,7 +70,11 @@ app.use(
         return origin;
       }
       // In production, restrict to your actual domain
-      if (origin?.includes("pages.dev") || origin?.includes("ppoi.app") || origin?.includes("your-domain.com")) {
+      if (
+        origin?.includes("pages.dev") ||
+        origin?.includes("ppoi.app") ||
+        origin?.includes("your-domain.com")
+      ) {
         return origin;
       }
       // Allow requests without origin (e.g., mobile apps, Postman)
@@ -52,9 +82,14 @@ app.use(
       return null;
     },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-PPOI-User", "X-Internal-API"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-PPOI-User",
+      "X-Internal-API",
+    ],
     credentials: true,
-  })
+  }),
 );
 
 // Health check
@@ -91,21 +126,27 @@ app.route("/v1", imagesRoute); // Keep images last since it has /:imageId catch-
 
 // 404 Handler
 app.notFound((c) => {
-  return c.json({
-    error: "Not Found",
-    message: "The requested endpoint does not exist",
-    path: c.req.path,
-  }, 404);
+  return c.json(
+    {
+      error: "Not Found",
+      message: "The requested endpoint does not exist",
+      path: c.req.path,
+    },
+    404,
+  );
 });
 
 // Error Handler
 app.onError((err, c) => {
   console.error("Worker error:", err);
-  
-  return c.json({
-    error: "Internal Server Error",
-    message: "An unexpected error occurred",
-  }, 500);
+
+  return c.json(
+    {
+      error: "Internal Server Error",
+      message: "An unexpected error occurred",
+    },
+    500,
+  );
 });
 
 export default app;

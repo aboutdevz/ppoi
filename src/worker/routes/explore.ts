@@ -8,6 +8,12 @@ import * as schema from "../../db/schema";
 
 export const exploreRoute = new Hono<{ Bindings: Env }>();
 
+// Cache configuration
+const CACHE_TTL = {
+  EXPLORE: 300, // 5 minutes
+  TRENDING_TAGS: 900, // 15 minutes
+} as const;
+
 const exploreQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -23,8 +29,23 @@ exploreRoute.get(
   async (c) => {
     try {
       const { page, limit, sortBy, tags, aspectRatio } = c.req.valid("query");
-      const db = drizzle(c.env.DB, { schema });
 
+      // Generate cache key based on query parameters
+      const cacheKey = `explore:${sortBy}:${aspectRatio || "all"}:${tags || "none"}:${page}:${limit}`;
+
+      // Try to get cached response (only for first page and no user-specific data)
+      if (page === 1) {
+        const cached = await c.env.KV.get(cacheKey);
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          // Add cache headers
+          c.header("X-Cache", "HIT");
+          c.header("Cache-Control", "public, max-age=300");
+          return c.json(cachedData);
+        }
+      }
+
+      const db = drizzle(c.env.DB, { schema });
       const offset = (page - 1) * limit;
 
       // Build where conditions
@@ -186,13 +207,26 @@ exploreRoute.get(
         tags: tagsMap.get(image.id) || [],
       }));
 
-      return c.json({
+      const responseData = {
         data: formattedImages,
         pagination: {
           hasMore: page * limit < totalCount,
           total: totalCount,
         },
-      });
+      };
+
+      // Cache the response for first page only
+      if (page === 1) {
+        await c.env.KV.put(cacheKey, JSON.stringify(responseData), {
+          expirationTtl: CACHE_TTL.EXPLORE,
+        });
+      }
+
+      // Add cache headers
+      c.header("X-Cache", "MISS");
+      c.header("Cache-Control", "public, max-age=300");
+
+      return c.json(responseData);
     } catch (error) {
       console.error("Explore error:", error);
       return c.json({ error: "Failed to fetch images" }, 500);
@@ -204,6 +238,17 @@ exploreRoute.get(
 exploreRoute.get("/explore/trending-tags", async (c) => {
   try {
     const limit = parseInt(c.req.query("limit") || "20");
+    const cacheKey = `trending_tags:${limit}`;
+
+    // Try to get cached response
+    const cached = await c.env.KV.get(cacheKey);
+    if (cached) {
+      const cachedData = JSON.parse(cached);
+      c.header("X-Cache", "HIT");
+      c.header("Cache-Control", "public, max-age=900");
+      return c.json(cachedData);
+    }
+
     const db = drizzle(c.env.DB, { schema });
 
     const tags = await db
@@ -215,7 +260,17 @@ exploreRoute.get("/explore/trending-tags", async (c) => {
       .orderBy(desc(schema.tags.usage_count))
       .limit(Math.min(limit, 50)); // Max 50 tags
 
-    return c.json({ tags });
+    const responseData = { tags };
+
+    // Cache the response
+    await c.env.KV.put(cacheKey, JSON.stringify(responseData), {
+      expirationTtl: CACHE_TTL.TRENDING_TAGS,
+    });
+
+    c.header("X-Cache", "MISS");
+    c.header("Cache-Control", "public, max-age=900");
+
+    return c.json(responseData);
   } catch (error) {
     console.error("Trending tags error:", error);
     return c.json({ error: "Failed to fetch trending tags" }, 500);

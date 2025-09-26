@@ -5,6 +5,11 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import {
+  WebsiteSchema,
+  OrganizationSchema,
+  WebApplicationSchema,
+} from "@/components/seo/structured-data";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -112,6 +117,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <WebsiteSchema />
+        <OrganizationSchema />
+        <WebApplicationSchema />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background font-sans antialiased`}
       >

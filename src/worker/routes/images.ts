@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { Env } from "../index";
+import type { AiModels } from "@cloudflare/workers-types";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc, and, sql } from "drizzle-orm";
 import * as schema from "../../db/schema";
@@ -416,21 +417,38 @@ async function processRemixGenerationJob(
       throw new Error("Job not found");
     }
 
-    // Prepare AI model input
-    const modelName =
+    // Prepare AI model input with fallback
+    let modelName =
       job.quality === "quality"
         ? env.IMAGE_MODEL_QUALITY
         : env.IMAGE_MODEL_FAST;
 
+    // Fallback to a known working model if environment variables aren't set
+    if (!modelName) {
+      console.warn(
+        `Model not configured for quality: ${job.quality}, using fallback`,
+      );
+      modelName = "@cf/black-forest-labs/flux-1-schnell";
+    }
+
+    // Validate model name is configured
+    if (!modelName) {
+      throw new Error(`No model available for quality: ${job.quality}`);
+    }
+
+    console.log(`Using AI model: ${modelName} for remix job ${jobId}`);
+
     const aiInput = {
       prompt: job.prompt,
       ...(job.negativePrompt && { negative_prompt: job.negativePrompt }),
-      guidance: job.guidance,
-      num_steps: job.steps,
-      ...(job.seed && { seed: job.seed }),
       width: job.width,
       height: job.height,
+      num_steps: Math.min(job.steps, 20), // SDXL-Lightning max 20 steps
+      guidance: job.guidance,
+      ...(job.seed && { seed: job.seed }),
     };
+
+    console.log(`AI input for remix job ${jobId}:`, aiInput);
 
     // Generate image with Cloudflare AI
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -532,6 +550,38 @@ async function processRemixGenerationJob(
           updatedAt: new Date().toISOString(),
         })
         .where(eq(schema.users.id, job.userId));
+    }
+
+    // Generate and store prompt embedding for similarity search
+    try {
+      const embeddingResponse = (await env.AI.run(
+        env.EMBEDDING_MODEL as keyof AiModels,
+        { text: job.prompt },
+      )) as { data: number[][] };
+
+      if (embeddingResponse.data && embeddingResponse.data.length > 0) {
+        const embedding = embeddingResponse.data[0];
+
+        // Store in Vectorize with image ID and metadata
+        await env.VEC.upsert([
+          {
+            id: imageId,
+            values: embedding,
+            metadata: {
+              imageId: imageId,
+              userId: job.userId || "anonymous",
+              prompt: job.prompt.substring(0, 500), // Limit prompt length for metadata
+              model: modelName,
+              aspectRatio: job.aspectRatio,
+              parentId: parentImageId,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        ]);
+      }
+    } catch (error) {
+      console.warn("Failed to store remix embedding:", error);
+      // Continue without embedding - it's not critical for image generation
     }
 
     // Complete the job

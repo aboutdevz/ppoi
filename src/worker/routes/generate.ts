@@ -7,6 +7,18 @@ import type { AiModels } from "@cloudflare/workers-types";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "../../db/schema";
+import {
+  sanitizePrompt,
+  validateTags,
+  containsSuspiciousContent,
+  isValidAspectRatio,
+  isValidQuality,
+  isValidGuidance,
+  isValidSteps,
+  isValidSeed,
+  hashIp,
+  generateRateLimitKey,
+} from "../lib/security";
 
 // Rate limiting configuration
 const RATE_LIMITS = {
@@ -20,7 +32,7 @@ const generateRequestSchema = z.object({
   negativePrompt: z.string().max(500).optional(),
   quality: z.enum(["fast", "quality"]).default("fast"),
   guidance: z.number().min(1).max(30).default(7.5),
-  steps: z.number().min(1).max(50).default(20),
+  steps: z.number().min(1).max(20).default(20),
   seed: z.number().int().min(0).max(2147483647).optional(),
   aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4"]).default("1:1"),
   tags: z.array(z.string()).max(10).optional(),
@@ -73,6 +85,40 @@ generateRoute.post(
       const clientIp = c.req.header("CF-Connecting-IP") || "unknown";
       const userAgent = c.req.header("User-Agent") || "unknown";
 
+      // Additional security validation beyond Zod schema
+      const sanitizedPrompt = sanitizePrompt(data.prompt);
+      if (!sanitizedPrompt || sanitizedPrompt.length < 3) {
+        return c.json({ error: "Invalid prompt" }, 400);
+      }
+
+      if (containsSuspiciousContent(sanitizedPrompt)) {
+        return c.json({ error: "Content not allowed" }, 400);
+      }
+
+      // Validate additional parameters
+      if (!isValidQuality(data.quality)) {
+        return c.json({ error: "Invalid quality setting" }, 400);
+      }
+
+      if (!isValidAspectRatio(data.aspectRatio)) {
+        return c.json({ error: "Invalid aspect ratio" }, 400);
+      }
+
+      if (!isValidGuidance(data.guidance)) {
+        return c.json({ error: "Invalid guidance value" }, 400);
+      }
+
+      if (!isValidSteps(data.steps)) {
+        return c.json({ error: "Invalid steps value" }, 400);
+      }
+
+      if (data.seed !== undefined && !isValidSeed(data.seed)) {
+        return c.json({ error: "Invalid seed value" }, 400);
+      }
+
+      // Validate and sanitize tags
+      const sanitizedTags = validateTags(data.tags);
+
       // Get user from header (set by auth middleware)
       const userIdHeader = c.req.header("X-PPOI-User");
       let userId = userIdHeader || null;
@@ -116,19 +162,11 @@ generateRoute.post(
         return c.json({ error: "User not found" }, 400);
       }
 
-      // Rate limiting
-      const hash = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(clientIp),
-      );
-      const hashArray = Array.from(new Uint8Array(hash));
-      const hashHex = hashArray
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-
+      // Enhanced rate limiting with security utilities
+      const hashedIp = await hashIp(clientIp);
       const rateLimitKey = user.isAnonymous
-        ? `anon:${hashHex.slice(0, 16)}`
-        : `user:${userId}`;
+        ? generateRateLimitKey("anon", hashedIp.slice(0, 16), "hour")
+        : generateRateLimitKey("user", userId!, "hour");
 
       const rateLimit = user.isAnonymous
         ? RATE_LIMITS.ANONYMOUS
@@ -160,21 +198,36 @@ generateRoute.post(
 
       // Create generation job
       const jobId = nanoid();
-      const aspectRatioDimensions = {
-        "1:1": { width: 1024, height: 1024 },
-        "16:9": { width: 1344, height: 768 },
-        "9:16": { width: 768, height: 1344 },
-        "4:3": { width: 1152, height: 896 },
-        "3:4": { width: 896, height: 1152 },
-      };
+
+      // Different dimensions based on quality setting
+      const aspectRatioDimensions =
+        data.quality === "quality"
+          ? {
+              // Higher resolution for quality mode (1024px)
+              "1:1": { width: 1024, height: 1024 },
+              "16:9": { width: 1024, height: 576 },
+              "9:16": { width: 576, height: 1024 },
+              "4:3": { width: 1024, height: 768 },
+              "3:4": { width: 768, height: 1024 },
+            }
+          : {
+              // Lower resolution for fast mode (512px)
+              "1:1": { width: 512, height: 512 },
+              "16:9": { width: 512, height: 288 },
+              "9:16": { width: 288, height: 512 },
+              "4:3": { width: 512, height: 384 },
+              "3:4": { width: 384, height: 512 },
+            };
 
       const dimensions = aspectRatioDimensions[data.aspectRatio];
 
       const generationJob: schema.NewGenerationJob = {
         id: jobId,
         userId: userId,
-        prompt: data.prompt,
-        negativePrompt: data.negativePrompt || null,
+        prompt: sanitizedPrompt,
+        negativePrompt: data.negativePrompt
+          ? sanitizePrompt(data.negativePrompt)
+          : null,
         quality: data.quality,
         guidance: data.guidance,
         steps: data.steps,
@@ -182,7 +235,7 @@ generateRoute.post(
         aspectRatio: data.aspectRatio,
         width: dimensions.width,
         height: dimensions.height,
-        tags: data.tags ? JSON.stringify(data.tags) : null,
+        tags: sanitizedTags.length > 0 ? JSON.stringify(sanitizedTags) : null,
         isPrivate: data.isPrivate,
         status: "pending",
         error: null,
@@ -311,21 +364,42 @@ async function processGenerationJob(env: Env, jobId: string): Promise<void> {
       throw new Error("Job not found");
     }
 
-    // Prepare AI model input
-    const modelName =
-      job.quality === "quality"
-        ? env.IMAGE_MODEL_QUALITY
-        : env.IMAGE_MODEL_FAST;
+    // Prepare AI model input with fallbacks
+    let modelName =
+      job.quality == "quality" ? env.IMAGE_MODEL_QUALITY : env.IMAGE_MODEL_FAST;
+
+    // Fallback to a known working model if environment variables aren't set
+    if (!modelName) {
+      console.warn(
+        `Model not configured for quality: ${job.quality}, using fallback`,
+      );
+      modelName = "@cf/black-forest-labs/flux-1-schnell";
+    }
+
+    // Validate model name is configured
+    if (!modelName) {
+      throw new Error(`No model available for quality: ${job.quality}`);
+    }
+
+    console.log(`Using AI model: ${modelName} for job ${jobId}`);
+    console.log(
+      `Environment check - IMAGE_MODEL_FAST: ${env.IMAGE_MODEL_FAST}`,
+    );
+    console.log(
+      `Environment check - IMAGE_MODEL_QUALITY: ${env.IMAGE_MODEL_QUALITY}`,
+    );
 
     const aiInput = {
       prompt: job.prompt,
       ...(job.negativePrompt && { negative_prompt: job.negativePrompt }),
-      guidance: job.guidance,
-      num_steps: job.steps,
-      ...(job.seed && { seed: job.seed }),
       width: job.width,
       height: job.height,
+      num_steps: Math.min(job.steps, 20), // SDXL-Lightning max 20 steps
+      guidance: job.guidance,
+      ...(job.seed && { seed: job.seed }),
     };
+
+    console.log(`AI input for job ${jobId}:`, aiInput);
 
     // Generate image with Cloudflare AI
     const response = await env.AI.run(
@@ -446,6 +520,37 @@ async function processGenerationJob(env: Env, jobId: string): Promise<void> {
         .where(eq(schema.users.id, job.userId));
     }
 
+    // Generate and store prompt embedding for similarity search
+    try {
+      const embeddingResponse = (await env.AI.run(
+        env.EMBEDDING_MODEL as keyof AiModels,
+        { text: job.prompt },
+      )) as { data: number[][] };
+
+      if (embeddingResponse.data && embeddingResponse.data.length > 0) {
+        const embedding = embeddingResponse.data[0];
+
+        // Store in Vectorize with image ID and metadata
+        await env.VEC.upsert([
+          {
+            id: imageId,
+            values: embedding,
+            metadata: {
+              imageId: imageId,
+              userId: job.userId || "anonymous",
+              prompt: job.prompt.substring(0, 500), // Limit prompt length for metadata
+              model: modelName,
+              aspectRatio: job.aspectRatio,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        ]);
+      }
+    } catch (error) {
+      console.warn("Failed to store embedding:", error);
+      // Continue without embedding - it's not critical for image generation
+    }
+
     // Complete the job
     await db
       .update(schema.generationJobs)
@@ -538,7 +643,7 @@ Example response: anime, girl, purple hair, golden eyes, school uniform, portrai
 Tags:`;
 
     // Use Cloudflare AI for text generation to extract tags
-    const response = (await env.AI.run("@cf/meta/llama-2-7b-chat-fp16", {
+    const response = (await env.AI.run("@cf/google/gemma-7b-it-lora", {
       messages: [
         {
           role: "user",

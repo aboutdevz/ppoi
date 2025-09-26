@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "AI-powered anime profile picture generator",
-  "homepage": "https://ppoi.app",
+  "homepage": "https://ppoi.poipoi.click",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ppoi-ai/ppoi.git"
+    "url": "https://github.com/aboutdevz/ppoi.git"
   },
   "bugs": {
-    "url": "https://github.com/ppoi-ai/ppoi/issues"
+    "url": "https://github.com/aboutdevz/ppoi/issues"
   },
   "keywords": [
     "ai",
@@ -26,13 +26,14 @@
     "bun": ">=1.0.0"
   },
   "scripts": {
-    "dev:next": "next dev",
+    "dev:next": "next dev --turbopack",
     "dev:worker": "wrangler dev",
     "build": "next build",
     "build:worker": "wrangler deploy --dry-run",
     "start": "next start",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env production",
     "deploy:preview": "wrangler deploy --env preview",
+    "deploy:dev": "wrangler deploy",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
@@ -49,7 +50,11 @@
     "db:seed": "bunx tsx scripts/seed.ts",
     "generate:secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"",
     "clean": "rm -rf .next && rm -rf dist",
-    "prepare": "husky"
+    "prepare": "husky",
+    "setup:prod": "echo 'Run the commands in DEPLOYMENT.md to set up production resources'",
+    "verify:deploy": "curl -f https://ppoi.poipoi.click/v1/explore || echo 'Deployment verification failed'",
+    "logs:prod": "wrangler tail --env production",
+    "db:check": "wrangler d1 execute ppoi-db --env production --command 'SELECT COUNT(*) FROM users;'"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.10.0",

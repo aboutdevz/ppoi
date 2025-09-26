@@ -3,12 +3,12 @@
 import * as React from "react";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
-import { 
-  Wand2, 
-  Sparkles, 
-  Download, 
-  Share2, 
+// Using regular img for direct API image serving
+import {
+  Wand2,
+  Sparkles,
+  Download,
+  Share2,
   Heart,
   RefreshCw,
   Zap,
@@ -17,7 +17,7 @@ import {
   Lock,
   Unlock,
   Copy,
-  Check
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,21 +29,109 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 
-// Mock data for demonstration
-const popularPrompts = [
-  "anime girl with purple hair and golden eyes",
-  "cute cat girl with pink bow and school uniform",
-  "mysterious dark-haired anime boy with blue flames",
-  "kawaii magical girl with rainbow staff",
-  "cool anime warrior with silver armor",
-];
+// Improved prompt suggestions for better image generation
+const promptSuggestions = {
+  characters: [
+    "anime girl with purple hair and golden eyes",
+    "cute anime girl with cat ears and pink bow",
+    "mysterious dark-haired anime boy with blue flames",
+    "kawaii magical girl with rainbow staff",
+    "cool anime warrior with silver armor",
+    "elegant anime princess with flowing white dress",
+    "cyberpunk anime character with neon hair",
+    "anime schoolgirl with twin tails and uniform",
+  ],
+  styles: [
+    "detailed anime art style",
+    "soft anime painting style",
+    "vibrant anime colors",
+    "studio ghibli style",
+    "makoto shinkai style",
+    "cel shaded anime",
+    "kawaii art style",
+    "manga illustration style",
+  ],
+  details: [
+    "beautiful detailed eyes",
+    "flowing hair in wind",
+    "soft lighting and shadows",
+    "cherry blossom background",
+    "starry night sky",
+    "magical sparkles and effects",
+    "school uniform with tie",
+    "gentle smile expression",
+  ],
+  quality: [
+    "masterpiece, best quality",
+    "highly detailed",
+    "8k resolution",
+    "professional artwork",
+    "ultra sharp focus",
+    "perfect anatomy",
+    "beautiful composition",
+    "award winning art",
+  ],
+};
+
+const negativePromptSuggestions = {
+  quality: [
+    "low quality, blurry",
+    "bad anatomy, deformed",
+    "ugly, poorly drawn",
+    "low resolution, pixelated",
+    "watermark, signature",
+    "cropped, out of frame",
+    "jpeg artifacts, compression",
+    "overexposed, underexposed",
+  ],
+  anatomy: [
+    "extra limbs, missing limbs",
+    "malformed hands, bad hands",
+    "crossed eyes, lazy eye",
+    "asymmetrical face",
+    "disproportionate body",
+    "floating limbs",
+    "merged fingers",
+    "twisted neck",
+  ],
+  style: [
+    "realistic, photorealistic",
+    "3d render, cgi",
+    "western cartoon style",
+    "sketch, unfinished",
+    "monochrome, grayscale",
+    "overly dark, gothic",
+    "overly bright, oversaturated",
+    "childish, amateur",
+  ],
+  content: [
+    "nsfw, explicit content",
+    "violence, gore",
+    "text, words, letters",
+    "duplicate character",
+    "multiple heads",
+    "animal ears on human",
+    "robot, mechanical parts",
+    "old, elderly",
+  ],
+};
 
 const aspectRatios = [
-  { value: "1:1", label: "Square (1:1)", description: "Perfect for profile pictures" },
+  {
+    value: "1:1",
+    label: "Square (1:1)",
+    description: "Perfect for profile pictures",
+  },
   { value: "16:9", label: "Landscape (16:9)", description: "Wide format" },
   { value: "9:16", label: "Portrait (9:16)", description: "Tall format" },
   { value: "4:3", label: "Classic (4:3)", description: "Traditional ratio" },
@@ -51,8 +139,18 @@ const aspectRatios = [
 ];
 
 const qualityOptions = [
-  { value: "fast", label: "Fast", description: "Quick generation, good quality", icon: Zap },
-  { value: "quality", label: "High Quality", description: "Slower but better results", icon: Sparkles },
+  {
+    value: "fast",
+    label: "Fast",
+    description: "Quick generation, good quality",
+    icon: Zap,
+  },
+  {
+    value: "quality",
+    label: "High Quality",
+    description: "Slower but better results",
+    icon: Sparkles,
+  },
 ];
 
 type GenerationStatus = "idle" | "generating" | "completed" | "error";
@@ -81,7 +179,9 @@ export default function GeneratePage() {
   const [newTag, setNewTag] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [status, setStatus] = useState<GenerationStatus>("idle");
-  const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(
+    null,
+  );
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -92,7 +192,7 @@ export default function GeneratePage() {
     if (!canGenerate) return;
 
     setStatus("generating");
-    
+
     try {
       // Start generation
       const generateResponse = await api.generateImage({
@@ -114,10 +214,10 @@ export default function GeneratePage() {
       const pollInterval = setInterval(async () => {
         try {
           const statusResponse = await api.getGenerationStatus(jobId);
-          
+
           if (statusResponse.status === "completed" && statusResponse.image) {
             clearInterval(pollInterval);
-            
+
             const generatedImg: GeneratedImage = {
               id: statusResponse.image.id,
               url: statusResponse.image.url,
@@ -130,15 +230,16 @@ export default function GeneratePage() {
               },
               createdAt: new Date().toISOString(),
             };
-            
+
             setGeneratedImage(generatedImg);
             setStatus("completed");
             toast.success("Image generated successfully!");
-            
           } else if (statusResponse.status === "failed") {
             clearInterval(pollInterval);
             setStatus("error");
-            toast.error(statusResponse.error || "Generation failed. Please try again.");
+            toast.error(
+              statusResponse.error || "Generation failed. Please try again.",
+            );
           }
         } catch {
           clearInterval(pollInterval);
@@ -148,23 +249,27 @@ export default function GeneratePage() {
       }, 2000); // Poll every 2 seconds
 
       // Cleanup interval after 5 minutes to prevent indefinite polling
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        // Check current status state instead of the stale closure value
-        setStatus(currentStatus => {
-          if (currentStatus === "generating") {
-            toast.error("Generation timed out. Please try again.");
-            return "error";
-          }
-          return currentStatus;
-        });
-      }, 5 * 60 * 1000);
-
+      setTimeout(
+        () => {
+          clearInterval(pollInterval);
+          // Check current status state instead of the stale closure value
+          setStatus((currentStatus) => {
+            if (currentStatus === "generating") {
+              toast.error("Generation timed out. Please try again.");
+              return "error";
+            }
+            return currentStatus;
+          });
+        },
+        5 * 60 * 1000,
+      );
     } catch (error) {
       console.error("Generation failed:", error);
       setStatus("error");
       if (error instanceof Error) {
-        toast.error(error.message || "Failed to generate image. Please try again.");
+        toast.error(
+          error.message || "Failed to generate image. Please try again.",
+        );
       } else {
         toast.error("Failed to generate image. Please try again.");
       }
@@ -179,11 +284,7 @@ export default function GeneratePage() {
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleUsePrompt = (selectedPrompt: string) => {
-    setPrompt(selectedPrompt);
+    setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
   const handleCopyPrompt = async () => {
@@ -195,17 +296,59 @@ export default function GeneratePage() {
     }
   };
 
-  const handleDownload = () => {
-    if (generatedImage) {
-      // Mock download - in real implementation this would download the actual image
+  const handleDownload = async () => {
+    if (!generatedImage) return;
+
+    try {
+      const response = await fetch(generatedImage.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ppoi-${generatedImage.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
       toast.success("Image downloaded!");
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast.error("Failed to download image");
     }
   };
 
-  const handleShare = () => {
-    if (generatedImage) {
-      // Mock share - in real implementation this would share the image
-      toast.success("Share link copied to clipboard!");
+  const handleShare = async () => {
+    if (!generatedImage) return;
+
+    try {
+      const shareUrl = `${window.location.origin}/i/${generatedImage.id}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: "Check out my AI anime creation!",
+          text: `I created this with ppoi: "${generatedImage.prompt.slice(0, 100)}..."`,
+          url: shareUrl,
+        });
+        toast.success("Shared successfully!");
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Share link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Share failed:", error);
+      toast.error("Failed to share image");
+    }
+  };
+
+  const handleLike = async () => {
+    if (!generatedImage) return;
+
+    try {
+      await api.likeImage(generatedImage.id);
+      toast.success("Added to favorites!");
+    } catch (error) {
+      console.error("Like failed:", error);
+      toast.error("Failed to like image. Please sign in first.");
     }
   };
 
@@ -228,8 +371,8 @@ export default function GeneratePage() {
               Profile Picture
             </h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Describe your perfect anime character and watch AI bring it to life. 
-              Generate, customize, and share stunning profile pictures.
+              Describe your perfect anime character and watch AI bring it to
+              life. Generate, customize, and share stunning profile pictures.
             </p>
           </div>
 
@@ -250,36 +393,140 @@ export default function GeneratePage() {
                 <CardContent className="space-y-6">
                   {/* Prompt Input */}
                   <div className="space-y-2">
-                    <Label htmlFor="prompt">Describe your character *</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="prompt">Describe your character *</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPrompt("")}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Clear
+                      </Button>
+                    </div>
                     <Textarea
                       id="prompt"
-                      placeholder="e.g., anime girl with purple hair and golden eyes, wearing a school uniform, smiling..."
+                      placeholder="e.g., masterpiece, best quality, anime girl with purple hair and golden eyes, detailed beautiful eyes, flowing hair, school uniform, cherry blossom background, soft lighting"
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      className="min-h-20 resize-none"
+                      className="min-h-24 resize-none"
                       maxLength={1000}
                     />
-                    <div className="text-xs text-muted-foreground text-right">
-                      {prompt.length}/1000 characters
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        💡 Tip: Be specific about details, style, and quality
+                        for better results
+                      </span>
+                      <span>{prompt.length}/1000</span>
                     </div>
                   </div>
 
-                  {/* Popular Prompts */}
-                  <div className="space-y-2">
-                    <Label>Popular Prompts</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {popularPrompts.map((popularPrompt) => (
-                        <Button
-                          key={popularPrompt}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUsePrompt(popularPrompt)}
-                          className="text-xs hover:bg-brand-primary/10 hover:border-brand-primary/50"
-                        >
-                          {popularPrompt}
-                        </Button>
-                      ))}
-                    </div>
+                  {/* Prompt Suggestions */}
+                  <div className="space-y-3">
+                    <Label>Prompt Suggestions</Label>
+                    <Tabs defaultValue="characters" className="w-full">
+                      <TabsList className="grid w-full grid-cols-4 h-8">
+                        <TabsTrigger value="characters" className="text-xs">
+                          Characters
+                        </TabsTrigger>
+                        <TabsTrigger value="styles" className="text-xs">
+                          Styles
+                        </TabsTrigger>
+                        <TabsTrigger value="details" className="text-xs">
+                          Details
+                        </TabsTrigger>
+                        <TabsTrigger value="quality" className="text-xs">
+                          Quality
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent
+                        value="characters"
+                        className="space-y-2 mt-3"
+                      >
+                        <div className="flex flex-wrap gap-2">
+                          {promptSuggestions.characters.map((suggestion) => (
+                            <Button
+                              key={suggestion}
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setPrompt(
+                                  (prev) =>
+                                    prev + (prev ? ", " : "") + suggestion,
+                                )
+                              }
+                              className="text-xs hover:bg-brand-primary/10 hover:border-brand-primary/50"
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="styles" className="space-y-2 mt-3">
+                        <div className="flex flex-wrap gap-2">
+                          {promptSuggestions.styles.map((suggestion) => (
+                            <Button
+                              key={suggestion}
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setPrompt(
+                                  (prev) =>
+                                    prev + (prev ? ", " : "") + suggestion,
+                                )
+                              }
+                              className="text-xs hover:bg-brand-primary/10 hover:border-brand-primary/50"
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="details" className="space-y-2 mt-3">
+                        <div className="flex flex-wrap gap-2">
+                          {promptSuggestions.details.map((suggestion) => (
+                            <Button
+                              key={suggestion}
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setPrompt(
+                                  (prev) =>
+                                    prev + (prev ? ", " : "") + suggestion,
+                                )
+                              }
+                              className="text-xs hover:bg-brand-primary/10 hover:border-brand-primary/50"
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="quality" className="space-y-2 mt-3">
+                        <div className="flex flex-wrap gap-2">
+                          {promptSuggestions.quality.map((suggestion) => (
+                            <Button
+                              key={suggestion}
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setPrompt(
+                                  (prev) =>
+                                    prev + (prev ? ", " : "") + suggestion,
+                                )
+                              }
+                              className="text-xs hover:bg-brand-primary/10 hover:border-brand-primary/50"
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
 
                   <Separator />
@@ -290,7 +537,7 @@ export default function GeneratePage() {
                       <TabsTrigger value="basic">Basic</TabsTrigger>
                       <TabsTrigger value="advanced">Advanced</TabsTrigger>
                     </TabsList>
-                    
+
                     <TabsContent value="basic" className="space-y-4">
                       {/* Quality */}
                       <div className="space-y-2">
@@ -299,19 +546,25 @@ export default function GeneratePage() {
                           {qualityOptions.map((option) => (
                             <Button
                               key={option.value}
-                              variant={quality === option.value ? "default" : "outline"}
+                              variant={
+                                quality === option.value ? "default" : "outline"
+                              }
                               onClick={() => setQuality(option.value)}
                               className={`p-4 h-auto flex flex-col items-start ${
-                                quality === option.value 
-                                  ? "bg-brand-primary text-white" 
+                                quality === option.value
+                                  ? "bg-brand-primary text-white"
                                   : "hover:bg-brand-primary/10 hover:border-brand-primary/50"
                               }`}
                             >
                               <div className="flex items-center gap-2 mb-1">
                                 <option.icon className="h-4 w-4" />
-                                <span className="font-medium">{option.label}</span>
+                                <span className="font-medium">
+                                  {option.label}
+                                </span>
                               </div>
-                              <span className="text-xs opacity-70">{option.description}</span>
+                              <span className="text-xs opacity-70">
+                                {option.description}
+                              </span>
                             </Button>
                           ))}
                         </div>
@@ -320,7 +573,10 @@ export default function GeneratePage() {
                       {/* Aspect Ratio */}
                       <div className="space-y-2">
                         <Label>Aspect Ratio</Label>
-                        <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                        <Select
+                          value={aspectRatio}
+                          onValueChange={setAspectRatio}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -328,8 +584,12 @@ export default function GeneratePage() {
                             {aspectRatios.map((ratio) => (
                               <SelectItem key={ratio.value} value={ratio.value}>
                                 <div>
-                                  <div className="font-medium">{ratio.label}</div>
-                                  <div className="text-xs text-muted-foreground">{ratio.description}</div>
+                                  <div className="font-medium">
+                                    {ratio.label}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {ratio.description}
+                                  </div>
                                 </div>
                               </SelectItem>
                             ))}
@@ -337,19 +597,173 @@ export default function GeneratePage() {
                         </Select>
                       </div>
                     </TabsContent>
-                    
+
                     <TabsContent value="advanced" className="space-y-4">
                       {/* Negative Prompt */}
-                      <div className="space-y-2">
-                        <Label htmlFor="negative-prompt">Negative Prompt (Optional)</Label>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="negative-prompt">
+                            Negative Prompt (Optional)
+                          </Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setNegativePrompt("")}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Clear
+                          </Button>
+                        </div>
                         <Textarea
                           id="negative-prompt"
-                          placeholder="What you don't want to see (e.g., blurry, low quality, distorted)"
+                          placeholder="What you don't want to see (e.g., low quality, blurry, bad anatomy, distorted)"
                           value={negativePrompt}
                           onChange={(e) => setNegativePrompt(e.target.value)}
                           className="resize-none"
                           maxLength={500}
                         />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>
+                            💡 Tip: Add common issues you want to avoid for
+                            cleaner results
+                          </span>
+                          <span>{negativePrompt.length}/500</span>
+                        </div>
+
+                        {/* Negative Prompt Suggestions */}
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Common Issues to Avoid
+                          </Label>
+                          <Tabs defaultValue="quality" className="w-full">
+                            <TabsList className="grid w-full grid-cols-4 h-8">
+                              <TabsTrigger value="quality" className="text-xs">
+                                Quality
+                              </TabsTrigger>
+                              <TabsTrigger value="anatomy" className="text-xs">
+                                Anatomy
+                              </TabsTrigger>
+                              <TabsTrigger value="style" className="text-xs">
+                                Style
+                              </TabsTrigger>
+                              <TabsTrigger value="content" className="text-xs">
+                                Content
+                              </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent
+                              value="quality"
+                              className="space-y-2 mt-2"
+                            >
+                              <div className="flex flex-wrap gap-1">
+                                {negativePromptSuggestions.quality.map(
+                                  (suggestion) => (
+                                    <Button
+                                      key={suggestion}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setNegativePrompt(
+                                          (prev) =>
+                                            prev +
+                                            (prev ? ", " : "") +
+                                            suggestion,
+                                        )
+                                      }
+                                      className="text-xs hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950 dark:hover:border-red-800"
+                                    >
+                                      {suggestion}
+                                    </Button>
+                                  ),
+                                )}
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent
+                              value="anatomy"
+                              className="space-y-2 mt-2"
+                            >
+                              <div className="flex flex-wrap gap-1">
+                                {negativePromptSuggestions.anatomy.map(
+                                  (suggestion) => (
+                                    <Button
+                                      key={suggestion}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setNegativePrompt(
+                                          (prev) =>
+                                            prev +
+                                            (prev ? ", " : "") +
+                                            suggestion,
+                                        )
+                                      }
+                                      className="text-xs hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950 dark:hover:border-red-800"
+                                    >
+                                      {suggestion}
+                                    </Button>
+                                  ),
+                                )}
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent
+                              value="style"
+                              className="space-y-2 mt-2"
+                            >
+                              <div className="flex flex-wrap gap-1">
+                                {negativePromptSuggestions.style.map(
+                                  (suggestion) => (
+                                    <Button
+                                      key={suggestion}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setNegativePrompt(
+                                          (prev) =>
+                                            prev +
+                                            (prev ? ", " : "") +
+                                            suggestion,
+                                        )
+                                      }
+                                      className="text-xs hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950 dark:hover:border-red-800"
+                                    >
+                                      {suggestion}
+                                    </Button>
+                                  ),
+                                )}
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent
+                              value="content"
+                              className="space-y-2 mt-2"
+                            >
+                              <div className="flex flex-wrap gap-1">
+                                {negativePromptSuggestions.content.map(
+                                  (suggestion) => (
+                                    <Button
+                                      key={suggestion}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setNegativePrompt(
+                                          (prev) =>
+                                            prev +
+                                            (prev ? ", " : "") +
+                                            suggestion,
+                                        )
+                                      }
+                                      className="text-xs hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950 dark:hover:border-red-800"
+                                    >
+                                      {suggestion}
+                                    </Button>
+                                  ),
+                                )}
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        </div>
                       </div>
 
                       {/* Guidance Scale */}
@@ -401,7 +815,11 @@ export default function GeneratePage() {
                         onKeyPress={(e) => e.key === "Enter" && handleAddTag()}
                         className="flex-1"
                       />
-                      <Button onClick={handleAddTag} variant="outline" size="icon">
+                      <Button
+                        onClick={handleAddTag}
+                        variant="outline"
+                        size="icon"
+                      >
                         <Tag className="h-4 w-4" />
                       </Button>
                     </div>
@@ -424,7 +842,11 @@ export default function GeneratePage() {
                   {/* Privacy */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {isPrivate ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                      {isPrivate ? (
+                        <Lock className="h-4 w-4" />
+                      ) : (
+                        <Unlock className="h-4 w-4" />
+                      )}
                       <Label htmlFor="private">Private Generation</Label>
                     </div>
                     <Switch
@@ -465,7 +887,9 @@ export default function GeneratePage() {
               className="space-y-6"
             >
               {/* Generation Status */}
-              {(isGenerating || status === "completed" || status === "error") && (
+              {(isGenerating ||
+                status === "completed" ||
+                status === "error") && (
                 <Card className="border-border/40 bg-background/50 backdrop-blur-sm">
                   <CardContent className="p-6">
                     {isGenerating && (
@@ -474,7 +898,9 @@ export default function GeneratePage() {
                           <RefreshCw className="w-8 h-8 text-white animate-spin" />
                         </div>
                         <div>
-                          <h3 className="font-semibold mb-2">Creating your anime character...</h3>
+                          <h3 className="font-semibold mb-2">
+                            Creating your anime character...
+                          </h3>
                           <p className="text-sm text-muted-foreground">
                             This usually takes 30-60 seconds
                           </p>
@@ -491,9 +917,12 @@ export default function GeneratePage() {
                           <Wand2 className="w-8 h-8 text-destructive-foreground" />
                         </div>
                         <div>
-                          <h3 className="font-semibold mb-2 text-destructive">Generation Failed</h3>
+                          <h3 className="font-semibold mb-2 text-destructive">
+                            Generation Failed
+                          </h3>
                           <p className="text-sm text-muted-foreground">
-                            Something went wrong. Please try again with a different prompt.
+                            Something went wrong. Please try again with a
+                            different prompt.
                           </p>
                         </div>
                         <Button onClick={handleGenerate} variant="outline">
@@ -512,11 +941,11 @@ export default function GeneratePage() {
                     {/* Image */}
                     <div className="relative group">
                       <div className="w-full aspect-square relative rounded-lg overflow-hidden shadow-lg">
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={generatedImage.url}
                           alt="Generated anime character"
-                          fill
-                          className="object-cover"
+                          className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                       </div>
@@ -524,15 +953,28 @@ export default function GeneratePage() {
 
                     {/* Actions */}
                     <div className="flex gap-2">
-                      <Button onClick={handleDownload} variant="outline" className="flex-1">
+                      <Button
+                        onClick={handleDownload}
+                        variant="outline"
+                        className="flex-1 hover:bg-brand-primary/10 hover:border-brand-primary/50"
+                      >
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>
-                      <Button onClick={handleShare} variant="outline" className="flex-1">
+                      <Button
+                        onClick={handleShare}
+                        variant="outline"
+                        className="flex-1 hover:bg-brand-primary/10 hover:border-brand-primary/50"
+                      >
                         <Share2 className="w-4 h-4 mr-2" />
                         Share
                       </Button>
-                      <Button variant="outline" size="icon">
+                      <Button
+                        onClick={handleLike}
+                        variant="outline"
+                        size="icon"
+                        className="hover:bg-red-50 hover:border-red-200 hover:text-red-500 dark:hover:bg-red-950 dark:hover:border-red-800"
+                      >
                         <Heart className="w-4 h-4" />
                       </Button>
                     </div>
@@ -547,7 +989,11 @@ export default function GeneratePage() {
                           size="sm"
                           className="text-xs"
                         >
-                          {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                          {copied ? (
+                            <Check className="w-3 h-3 mr-1" />
+                          ) : (
+                            <Copy className="w-3 h-3 mr-1" />
+                          )}
                           {copied ? "Copied!" : "Copy"}
                         </Button>
                       </div>
@@ -560,19 +1006,27 @@ export default function GeneratePage() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Quality:</span>{" "}
-                        <span className="font-medium capitalize">{generatedImage.settings.quality}</span>
+                        <span className="font-medium capitalize">
+                          {generatedImage.settings.quality}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Ratio:</span>{" "}
-                        <span className="font-medium">{generatedImage.settings.aspectRatio}</span>
+                        <span className="font-medium">
+                          {generatedImage.settings.aspectRatio}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Guidance:</span>{" "}
-                        <span className="font-medium">{generatedImage.settings.guidance}</span>
+                        <span className="font-medium">
+                          {generatedImage.settings.guidance}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Steps:</span>{" "}
-                        <span className="font-medium">{generatedImage.settings.steps}</span>
+                        <span className="font-medium">
+                          {generatedImage.settings.steps}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -586,9 +1040,12 @@ export default function GeneratePage() {
                     <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center mb-4">
                       <ImageIcon className="w-8 h-8 text-muted-foreground" />
                     </div>
-                    <h3 className="font-semibold mb-2">Your generated image will appear here</h3>
+                    <h3 className="font-semibold mb-2">
+                      Your generated image will appear here
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      Fill out the form and click generate to create your anime character
+                      Fill out the form and click generate to create your anime
+                      character
                     </p>
                   </CardContent>
                 </Card>
