@@ -376,7 +376,7 @@ export function LandingHero() {
             >
               <Link href="/generate">
                 <Zap className="w-5 h-5 mr-3 group-hover:animate-pulse" />
-                🎯 START CREATING POI!
+                START CREATING POI!
                 <ArrowRight className="w-5 h-5 ml-3 group-hover:translate-x-2 transition-transform" />
               </Link>
             </Button>
@@ -388,7 +388,7 @@ export function LandingHero() {
             >
               <Link href="/explore">
                 <ImageIcon className="w-5 h-5 mr-3" />
-                🌟 EXPLORE GALLERY
+                EXPLORE GALLERY
               </Link>
             </Button>
           </motion.div>
@@ -538,7 +538,7 @@ export function LandingFeatures() {
             >
               <Link href="/generate">
                 <Star className="w-5 h-5 mr-3 animate-pulse" />
-                🎨 START YOUR POI JOURNEY!
+                START YOUR POI JOURNEY!
               </Link>
             </Button>
           </div>
@@ -726,7 +726,7 @@ export function LandingShowcase() {
             >
               <Link href="/explore">
                 <ImageIcon className="w-5 h-5 mr-3 animate-pulse" />
-                🇿 EXPLORE POI GALLERY!
+                EXPLORE POI GALLERY!
               </Link>
             </Button>
           </div>
@@ -843,7 +843,7 @@ export function LandingCTA() {
             >
               <Link href="/generate">
                 <Sparkles className="w-6 h-6 mr-4 group-hover:animate-spin" />
-                🎆 GET STARTED FREE - POI NOW!
+                GET STARTED FREE - POI NOW!
                 <ArrowRight className="w-6 h-6 ml-4 group-hover:translate-x-3 transition-transform" />
               </Link>
             </Button>
@@ -855,7 +855,7 @@ export function LandingCTA() {
             >
               <Link href="/explore">
                 <ImageIcon className="w-6 h-6 mr-4" />
-                🇿 VIEW POI EXAMPLES
+                VIEW POI EXAMPLES
               </Link>
             </Button>
           </motion.div>

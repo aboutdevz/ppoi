@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { motion } from "framer-motion";
-import { Search, PlusCircle, Heart, LogOut, Settings } from "lucide-react";
+import { Search, PlusCircle, Heart, LogOut, Settings, Bug } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -246,6 +246,15 @@ function UserMenu() {
             <span>Settings</span>
           </Link>
         </DropdownMenuItem>
+        {/* Debug menu - show in development or for admins */}
+
+        <DropdownMenuItem asChild>
+          <Link href="/debug" className="flex items-center text-orange-600">
+            <Bug className="mr-2 h-4 w-4" />
+            <span>Debug Env</span>
+          </Link>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut({ callbackUrl: "/" })}

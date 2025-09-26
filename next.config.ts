@@ -39,76 +39,24 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "framer-motion"],
     webpackBuildWorker: true,
     optimizeCss: true,
-  },
-
-  // Security headers
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "X-XSS-Protection",
-            value: "1; mode=block",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            key: "Permissions-Policy",
-            value:
-              "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains; preload",
-          },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob: https: http://localhost:8787 https://ppoi-api.poipoi.click",
-              "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https: http://localhost:8787 https://ppoi-api.poipoi.click ws://localhost:*",
-              "media-src 'self' data: blob:",
-              "worker-src 'self' blob:",
-              "frame-ancestors 'none'",
-            ].join("; "),
-          },
-        ],
+    // Turbopack configuration
+    turbo: {
+      rules: {
+        // Custom loader rules for Turbopack
+        "*.svg": {
+          loaders: ["@svgr/webpack"],
+          as: "*.js",
+        },
       },
-      // Static assets caching
-      {
-        source: "/:path*\\.(ico|png|jpg|jpeg|gif|webp|svg|woff|woff2)",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
+      resolveAlias: {
+        // Resolve aliases for better performance
+        "@": "./src",
+        "@/components": "./src/components",
+        "@/lib": "./src/lib",
+        "@/db": "./src/db",
+        "@/types": "./src/types",
       },
-      // API routes additional headers
-      {
-        source: "/api/(.*)",
-        headers: [
-          {
-            key: "X-Robots-Tag",
-            value: "noindex, nofollow",
-          },
-        ],
-      },
-    ];
+    },
   },
 
   // Webpack configuration

@@ -256,7 +256,6 @@ export function PulsingOrbs() {
 export function PoiEffects() {
   return (
     <>
-      <SakuraPetalsWithWind />
       <PoiParticles />
       <AnimatedGrid />
       <PulsingOrbs />
