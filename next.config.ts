@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Cloudflare Pages compatibility
-  output: "standalone",
+  // OpenNext will handle the build output
+  // output: "standalone", // Removed for OpenNext compatibility
 
   // Image optimization
   images: {
@@ -20,10 +20,10 @@ const nextConfig: NextConfig = {
         port: "8787",
         pathname: "/v1/serve/**",
       },
-      // Production: ppoi.poipoi.click worker API
+      // Production: ppoi-api.poipoi.click worker API
       {
         protocol: "https",
-        hostname: "ppoi.poipoi.click",
+        hostname: "ppoi-api.poipoi.click",
         port: "",
         pathname: "/v1/serve/**",
       },
@@ -78,9 +78,9 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob: https: http://localhost:8787 https://ppoi.poipoi.click",
+              "img-src 'self' data: blob: https: http://localhost:8787 https://ppoi-api.poipoi.click",
               "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https: http://localhost:8787 https://ppoi.poipoi.click ws://localhost:*",
+              "connect-src 'self' https: http://localhost:8787 https://ppoi-api.poipoi.click ws://localhost:*",
               "media-src 'self' data: blob:",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",

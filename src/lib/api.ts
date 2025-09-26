@@ -19,7 +19,7 @@ class ApiClient {
     this.baseUrl =
       process.env.NEXT_PUBLIC_API_URL ||
       (process.env.NODE_ENV === "production"
-        ? "https://ppoi.poipoi.click/v1"
+        ? "https://ppoi-api.poipoi.click/v1"
         : "http://localhost:8787/v1");
   }
 
@@ -58,7 +58,10 @@ class ApiClient {
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
-          const errorData = await response.json();
+          const errorData = (await response.json()) as {
+            error?: string;
+            message?: string;
+          };
           errorMessage = errorData.error || errorData.message || errorMessage;
         } catch {
           // Fallback to status text if no JSON error

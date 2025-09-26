@@ -34,6 +34,10 @@ export interface Env {
   TURNSTILE_SECRET?: string;
   RESEND_API_KEY?: string;
   NEXTAUTH_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  DISCORD_CLIENT_ID?: string;
+  DISCORD_CLIENT_SECRET?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -69,11 +73,11 @@ app.use(
       if (origin?.includes("localhost") || origin?.includes("127.0.0.1")) {
         return origin;
       }
-      // In production, restrict to your actual domain
+      // In production, restrict to your actual domains
       if (
         origin?.includes("pages.dev") ||
-        origin?.includes("ppoi.app") ||
-        origin?.includes("your-domain.com")
+        origin?.includes("ppoi.poipoi.click") ||
+        origin?.includes("poipoi.click")
       ) {
         return origin;
       }

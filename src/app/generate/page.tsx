@@ -182,7 +182,6 @@ export default function GeneratePage() {
   const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(
     null,
   );
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const isGenerating = status === "generating";
@@ -207,7 +206,6 @@ export default function GeneratePage() {
       });
 
       const jobId = generateResponse.jobId;
-      setCurrentJobId(jobId);
       toast.success("Generation started! This may take a moment...");
 
       // Poll for completion

@@ -211,4 +211,4 @@ export interface LayoutProps {
   params: Promise<{ locale: string }>;
 }
 
-export default {};
+// No default export needed for type-only file

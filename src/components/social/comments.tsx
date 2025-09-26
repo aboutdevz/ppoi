@@ -41,7 +41,11 @@ interface CommentsProps {
   trigger?: React.ReactNode;
 }
 
-export function Comments({ imageId, initialCommentCount = 0, trigger }: CommentsProps) {
+export function Comments({
+  imageId,
+  initialCommentCount = 0,
+  trigger,
+}: CommentsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentCount, setCommentCount] = useState(initialCommentCount);
@@ -52,32 +56,35 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
   const [page, setPage] = useState(1);
 
   // Load comments when dialog opens
+  const loadComments = useCallback(
+    async (pageNum: number = 1, replace: boolean = false) => {
+      try {
+        setIsLoading(true);
+        const response = await api.getImageComments(imageId, pageNum, 20);
+
+        if (replace) {
+          setComments(response.data);
+        } else {
+          setComments((prev) => [...prev, ...response.data]);
+        }
+
+        setHasMore(response.pagination.hasMore);
+        setPage(pageNum);
+      } catch (error) {
+        console.error("Failed to load comments:", error);
+        toast.error("Failed to load comments");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [imageId],
+  );
+
   useEffect(() => {
     if (isOpen && comments.length === 0) {
       loadComments(1, true);
     }
-  }, [isOpen, comments.length]);
-
-  const loadComments = useCallback(async (pageNum: number = 1, replace: boolean = false) => {
-    try {
-      setIsLoading(true);
-      const response = await api.getImageComments(imageId, pageNum, 20);
-      
-      if (replace) {
-        setComments(response.data);
-      } else {
-        setComments(prev => [...prev, ...response.data]);
-      }
-      
-      setHasMore(response.pagination.hasMore);
-      setPage(pageNum);
-    } catch (error) {
-      console.error("Failed to load comments:", error);
-      toast.error("Failed to load comments");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [imageId]);
+  }, [isOpen, comments.length, loadComments]);
 
   // Load comments when dialog opens
   useEffect(() => {
@@ -88,20 +95,19 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newComment.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    
+
     try {
       const response = await api.commentOnImage(imageId, newComment.trim());
-      
+
       // Add new comment to the top of the list
-      setComments(prev => [response.comment, ...prev]);
-      setCommentCount(prev => prev + 1);
+      setComments((prev) => [response.comment, ...prev]);
+      setCommentCount((prev) => prev + 1);
       setNewComment("");
       toast.success("Comment added!");
-      
     } catch (error) {
       console.error("Failed to add comment:", error);
       toast.error("Failed to add comment. Please try again.");
@@ -113,8 +119,10 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
   const formatTimeAgo = (dateString: string) => {
     const now = new Date();
     const date = new Date(dateString);
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+    const diffInHours = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
+    );
+
     if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${diffInHours}h ago`;
     const diffInDays = Math.floor(diffInHours / 24);
@@ -132,7 +140,7 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
           </Button>
         )}
       </DialogTrigger>
-      
+
       <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -146,7 +154,10 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
 
         <div className="flex-1 flex flex-col min-h-0">
           {/* Comment form */}
-          <form onSubmit={handleSubmitComment} className="space-y-3 pb-4 border-b">
+          <form
+            onSubmit={handleSubmitComment}
+            className="space-y-3 pb-4 border-b"
+          >
             <Textarea
               placeholder="Write a comment..."
               value={newComment}
@@ -194,10 +205,12 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
                     {comment.user.name[0]}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{comment.user.name}</span>
+                    <span className="font-medium text-sm">
+                      {comment.user.name}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       @{comment.user.handle}
                     </span>
@@ -205,7 +218,7 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
                       {formatTimeAgo(comment.createdAt)}
                     </span>
                   </div>
-                  
+
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {comment.content}
                   </p>
@@ -213,9 +226,9 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <MoreVertical className="h-3 w-3" />
@@ -265,12 +278,12 @@ export function Comments({ imageId, initialCommentCount = 0, trigger }: Comments
 }
 
 // Simple comment button component
-export function CommentButton({ 
-  imageId, 
-  commentCount = 0 
-}: { 
-  imageId: string; 
-  commentCount?: number; 
+export function CommentButton({
+  imageId,
+  commentCount = 0,
+}: {
+  imageId: string;
+  commentCount?: number;
 }) {
   return (
     <Comments

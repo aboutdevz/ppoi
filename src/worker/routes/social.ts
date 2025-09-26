@@ -447,7 +447,7 @@ socialRoute.delete("/follow", zValidator("json", followSchema), async (c) => {
         ),
       );
 
-    if (result.rowsAffected === 0) {
+    if (result.meta.changes === 0) {
       return c.json({ error: "Not following" }, 404);
     }
 

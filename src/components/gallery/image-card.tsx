@@ -46,7 +46,6 @@ interface ImageCardProps {
 
 export function ImageCard({
   image,
-  onRemix,
   showUser = true,
   priority = false,
 }: ImageCardProps) {

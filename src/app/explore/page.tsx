@@ -125,8 +125,8 @@ export default function ExplorePage() {
         limit: 20,
       });
 
-      setImages(response.data);
-      setHasMore(response.pagination.hasMore);
+      setImages(response.results as unknown as ExploreImage[]);
+      setHasMore(response.pagination.hasNext);
       setPage(1);
     } catch (error) {
       console.error("Search failed:", error);

@@ -7,12 +7,12 @@ import { authOptions } from "@/lib/auth-config";
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as { action: string };
     const { action } = body;
 
     switch (action) {
@@ -25,15 +25,19 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("User API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 async function createOrSyncUser(session: Session) {
   try {
     // Call our Worker API to create or sync the user
-    const workerUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787/v1";
-    
+    const workerUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787/v1";
+
     const response = await fetch(`${workerUrl}/users/sync`, {
       method: "POST",
       headers: {
@@ -53,7 +57,7 @@ async function createOrSyncUser(session: Session) {
     }
 
     const userData = await response.json();
-    
+
     return NextResponse.json({
       success: true,
       user: userData,
@@ -66,8 +70,9 @@ async function createOrSyncUser(session: Session) {
 
 async function getUserProfile(session: Session) {
   try {
-    const workerUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787/v1";
-    
+    const workerUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787/v1";
+
     const response = await fetch(`${workerUrl}/users/${session.user.id}`, {
       method: "GET",
       headers: {
@@ -81,13 +86,16 @@ async function getUserProfile(session: Session) {
     }
 
     const userData = await response.json();
-    
+
     return NextResponse.json({
       success: true,
       user: userData,
     });
   } catch (error) {
     console.error("Get profile error:", error);
-    return NextResponse.json({ error: "Failed to get profile" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to get profile" },
+      { status: 500 },
+    );
   }
 }

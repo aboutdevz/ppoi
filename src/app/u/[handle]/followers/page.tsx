@@ -168,7 +168,7 @@ export default function FollowersPage() {
             <User className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">User not found</h2>
             <p className="text-muted-foreground mb-6">
-              The user profile you're looking for doesn't exist.
+              The user profile you&apos;re looking for doesn&apos;t exist.
             </p>
             <Button asChild>
               <Link href="/explore">Browse Gallery</Link>
@@ -200,7 +200,7 @@ export default function FollowersPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Users className="h-6 w-6 text-brand-primary" />
-              {profileUser.name}'s Followers
+              {profileUser.name}&apos;s Followers
             </h1>
             <p className="text-muted-foreground">
               {pagination.total}{" "}
@@ -222,7 +222,7 @@ export default function FollowersPage() {
                 <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="font-semibold mb-2">No followers yet</h3>
                 <p className="text-sm text-muted-foreground">
-                  This user hasn't gained any followers yet.
+                  This user hasn&apos;t gained any followers yet.
                 </p>
               </CardContent>
             </Card>

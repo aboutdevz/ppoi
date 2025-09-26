@@ -1,4 +1,4 @@
-# Deployment Guide for ppoi.poipoi.click
+# Deployment Guide for ppoi.poipoi.click (Frontend) and ppoi-api.poipoi.click (API)
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@
 
 2. **Domain Setup**:
    - Domain `poipoi.click` should be added to your Cloudflare account
-   - DNS records configured for the subdomain `ppoi.poipoi.click`
+   - DNS records configured for subdomains `ppoi.poipoi.click` (frontend) and `ppoi-api.poipoi.click` (API)
 
 ## Pre-deployment Steps
 
@@ -90,7 +90,7 @@ bun run deploy:preview
 2. **Configure Environment Variables in Pages**:
    - Add all variables from `.env.production`
    - Set `NODE_VERSION` to `18.17.0` or higher
-   - Set `NEXT_PUBLIC_API_URL` to `https://ppoi.poipoi.click/v1`
+   - Set `NEXT_PUBLIC_API_URL` to `https://ppoi-api.poipoi.click/v1`
 
 3. **Custom Domain Setup**:
    - In Pages settings, add custom domain: `ppoi.poipoi.click`
@@ -101,7 +101,7 @@ bun run deploy:preview
 1. **Check Worker API**:
 
    ```bash
-   curl https://ppoi.poipoi.click/v1/explore
+   curl https://ppoi-api.poipoi.click/v1/explore
    ```
 
 2. **Check Frontend**:
@@ -167,7 +167,7 @@ If issues occur:
 bunx wrangler tail --env production
 
 # Test API endpoint
-curl -X POST https://ppoi.poipoi.click/v1/generate \
+curl -X POST https://ppoi-api.poipoi.click/v1/generate \
   -H "Content-Type: application/json" \
   -d '{"prompt": "anime girl test"}'
 

@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (response.ok) {
-            const data = await response.json();
+            const data = (await response.json()) as { user: User };
             setUser(data.user);
           } else {
             console.error("Failed to sync user");
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         api.setUserToken(null);
       }
-      
+
       setIsLoading(status === "loading");
     };
 
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setIsLoading(true);
-      
+
       const response = await api.updateUserProfile(user.id, {
         name: updates.name,
         bio: updates.bio,
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as { user: User };
         setUser(data.user);
       }
     } catch (error) {
@@ -153,11 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
